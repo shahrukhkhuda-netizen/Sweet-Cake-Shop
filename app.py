@@ -4,1401 +4,523 @@ import plotly.express as px
 from io import BytesIO
 
 from database import (
-    get_cakes,
     add_customer,
     add_order,
-    get_orders,
-    get_dashboard_data,
     add_cake,
     update_cake,
     delete_cake,
-    generate_practice_orders
+    get_cakes,
+    get_dashboard_data,
+    get_orders,
+    get_recent_orders,
+    get_sales_by_cake,
+    get_sales_by_day,
+    generate_practice_orders,
 )
-
-
-# =========================================================
-# PAGE SETTINGS
-# =========================================================
 
 st.set_page_config(
     page_title="Sweet Cake Shop",
-    page_icon="🍰",
-    layout="wide"
+    page_icon="🎂",
+    layout="wide",
+    initial_sidebar_state="expanded",
 )
 
-
-# =========================================================
-# EXCEL REPORT
-# =========================================================
-
-def create_excel_report(orders_df):
-
-    output = BytesIO()
-
-    with pd.ExcelWriter(
-        output,
-        engine="openpyxl"
-    ) as writer:
-
-        orders_df.to_excel(
-            writer,
-            index=False,
-            sheet_name="Sales Report"
-        )
-
-        summary = pd.DataFrame({
-
-            "Metric": [
-                "Total Orders",
-                "Total Sales",
-                "Total Cakes Sold"
-            ],
-
-            "Value": [
-                len(orders_df),
-                orders_df["Amount"].sum(),
-                orders_df["Quantity"].sum()
-            ]
-        })
-
-        summary.to_excel(
-            writer,
-            index=False,
-            sheet_name="Summary"
-        )
-
-    output.seek(0)
-
-    return output
-
-
-# =========================================================
+# ---------------------------------------------------------
 # CUSTOM CSS
-# =========================================================
-
+# ---------------------------------------------------------
 st.markdown("""
 <style>
+    .stApp {
+        background: #fffaf8;
+    }
 
-.stApp {
-    background: #fff8f5;
-}
+    [data-testid="stSidebar"] {
+        background: #f3f5f9;
+    }
 
-.block-container {
-    padding-top: 1.5rem;
-    padding-bottom: 3rem;
-}
+    .brand {
+        font-size: 30px;
+        font-weight: 800;
+        color: #203a5f;
+        margin-bottom: 2px;
+    }
 
-.dashboard-header {
-    background: linear-gradient(
-        135deg,
-        #ff7eb3,
-        #ff758c,
-        #ff9a9e
-    );
+    .subtitle {
+        color: #7a8491;
+        font-size: 14px;
+        margin-bottom: 22px;
+    }
 
-    padding: 35px;
+    .hero {
+        padding: 34px;
+        border-radius: 0 0 28px 28px;
+        background: linear-gradient(135deg, #ff6f91, #ff9eb3);
+        box-shadow: 0 14px 30px rgba(205, 95, 125, .18);
+        margin-bottom: 24px;
+    }
 
-    border-radius: 22px;
+    .hero h1 {
+        color: #203a5f;
+        font-size: 34px;
+        margin: 0 0 8px 0;
+    }
 
-    margin-bottom: 25px;
+    .hero p {
+        color: #34495e;
+        font-size: 17px;
+        margin: 0;
+    }
 
-    color: white;
+    .section-title {
+        font-size: 27px;
+        font-weight: 800;
+        color: #203a5f;
+        margin: 20px 0 14px 0;
+    }
 
-    box-shadow:
-        0 10px 30px rgba(0,0,0,0.12);
-}
+    .cake-card {
+        background: white;
+        border: 1px solid #f0d9d4;
+        border-radius: 18px;
+        padding: 18px;
+        margin-bottom: 14px;
+        box-shadow: 0 7px 20px rgba(50, 50, 50, .06);
+    }
 
-.dashboard-header h1 {
-    color: white;
-    font-size: 38px;
-    margin-bottom: 5px;
-}
+    .cake-name {
+        font-size: 20px;
+        font-weight: 700;
+        color: #203a5f;
+    }
 
-.dashboard-header p {
-    color: white;
-    font-size: 17px;
-}
+    .price {
+        font-size: 18px;
+        font-weight: 700;
+        color: #d24b73;
+    }
 
-div[data-testid="stMetric"] {
+    .metric-note {
+        color: #7a8491;
+        font-size: 13px;
+        margin-top: -10px;
+    }
 
-    background: white;
+    div[data-testid="stMetric"] {
+        background: white;
+        border: 1px solid #f0d9d4;
+        padding: 16px;
+        border-radius: 16px;
+        box-shadow: 0 7px 20px rgba(50, 50, 50, .05);
+    }
 
-    padding: 20px;
-
-    border-radius: 18px;
-
-    border: 1px solid #f2dfda;
-
-    box-shadow:
-        0 6px 20px rgba(0,0,0,0.07);
-}
-
-div[data-testid="stMetricLabel"] {
-    font-weight: 700;
-}
-
-.section-box {
-
-    background: white;
-
-    padding: 20px;
-
-    border-radius: 18px;
-
-    margin-top: 15px;
-
-    margin-bottom: 15px;
-
-    box-shadow:
-        0 5px 18px rgba(0,0,0,0.06);
-}
-
-.menu-card {
-
-    background: white;
-
-    padding: 18px;
-
-    border-radius: 16px;
-
-    border: 1px solid #f1e4df;
-
-    margin-bottom: 15px;
-
-    box-shadow:
-        0 4px 15px rgba(0,0,0,0.05);
-}
-
+    .footer {
+        text-align: center;
+        color: #8993a0;
+        padding: 30px 0 10px 0;
+        font-size: 13px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-
-# =========================================================
+# ---------------------------------------------------------
 # SIDEBAR
-# =========================================================
+# ---------------------------------------------------------
+with st.sidebar:
+    st.markdown('<div class="brand">🍰 Sweet Cake Shop</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="subtitle">Cake Shop Management System</div>',
+        unsafe_allow_html=True
+    )
 
-st.sidebar.title("🍰 Sweet Cake Shop")
+    page = st.radio(
+        "Navigation",
+        [
+            "🏠 Home",
+            "🍰 Cake Menu",
+            "🛒 Order Cake",
+            "📊 Dashboard",
+            "🔐 Admin",
+        ],
+        label_visibility="visible",
+    )
 
-st.sidebar.caption(
-    "Cake Shop Management System"
-)
+    st.divider()
+    st.info("Fresh Cakes • Happy Customers 💗")
 
-page = st.sidebar.radio(
-    "Navigation",
-    [
-        "🏠 Home",
-        "🍰 Cake Menu",
-        "🛒 Order Cake",
-        "📊 Dashboard",
-        "🔐 Admin"
-    ]
-)
-
-st.sidebar.markdown("---")
-
-st.sidebar.info(
-    "Fresh Cakes • Happy Customers ❤️"
-)
+# ---------------------------------------------------------
+# HELPERS
+# ---------------------------------------------------------
+def money(value):
+    return f"₹{float(value):,.0f}"
 
 
-# =========================================================
+def create_excel_report():
+    orders = get_orders()
+
+    if not orders:
+        return None
+
+    df = pd.DataFrame(
+        orders,
+        columns=[
+            "Order ID", "Customer", "Phone", "Cake",
+            "Flavor", "Quantity", "Amount", "Order Date"
+        ],
+    )
+
+    summary = pd.DataFrame({
+        "Metric": [
+            "Total Orders",
+            "Total Sales",
+            "Total Cakes Sold",
+            "Total Customers",
+        ],
+        "Value": [
+            len(df),
+            df["Amount"].sum(),
+            df["Quantity"].sum(),
+            df["Customer"].nunique(),
+        ],
+    })
+
+    output = BytesIO()
+
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="Sales Report")
+        summary.to_excel(writer, index=False, sheet_name="Summary")
+
+    output.seek(0)
+    return output
+
+
+# ---------------------------------------------------------
 # HOME
-# =========================================================
-
+# ---------------------------------------------------------
 if page == "🏠 Home":
+    total_cakes, total_orders, total_customers, total_sales, sold, low_stock = get_dashboard_data()
 
     st.markdown("""
-    <div class="dashboard-header">
-
-        <h1>🍰 Welcome to Sweet Cake Shop</h1>
-
-        <p>
-        Freshly baked cakes for every special moment.
-        </p>
-
+    <div class="hero">
+        <h1>🎂 Welcome to Sweet Cake Shop</h1>
+        <p>Freshly baked cakes for birthdays, anniversaries and every special moment.</p>
     </div>
     """, unsafe_allow_html=True)
 
-    total_cakes, total_orders, total_customers, total_sales = (
-        get_dashboard_data()
-    )
+    c1, c2, c3, c4 = st.columns(4)
 
-    col1, col2, col3, col4 = st.columns(4)
+    c1.metric("🍰 Available Cakes", total_cakes)
+    c2.metric("🛒 Total Orders", total_orders)
+    c3.metric("👥 Customers", total_customers)
+    c4.metric("💰 Total Sales", money(total_sales))
 
-    with col1:
+    st.markdown('<div class="section-title">🎉 Celebrate Every Moment</div>', unsafe_allow_html=True)
 
-        st.metric(
-            "🍰 Available Cakes",
-            total_cakes
-        )
+    a, b, c = st.columns(3)
+    with a:
+        st.info("🎂 Birthday Cakes\n\nPerfect cakes for birthday celebrations.")
+    with b:
+        st.success("💍 Anniversary Cakes\n\nMake your special day sweeter.")
+    with c:
+        st.warning("🎊 Celebration Cakes\n\nBeautiful cakes for every occasion.")
 
-    with col2:
+    st.markdown('<div class="section-title">📦 Recent Orders</div>', unsafe_allow_html=True)
 
-        st.metric(
-            "🛒 Total Orders",
-            total_orders
-        )
-
-    with col3:
-
-        st.metric(
-            "👥 Customers",
-            total_customers
-        )
-
-    with col4:
-
-        st.metric(
-            "💰 Total Sales",
-            f"₹{total_sales:,.0f}"
-        )
-
-    st.markdown("---")
-
-    st.subheader(
-        "🎉 Celebrate Every Moment"
-    )
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-
-        st.info(
-            "🎂 Birthday Cakes"
-        )
-
-    with col2:
-
-        st.success(
-            "💍 Anniversary Cakes"
-        )
-
-    with col3:
-
-        st.warning(
-            "🎉 Celebration Cakes"
-        )
-
-
-# =========================================================
-# CAKE MENU
-# =========================================================
-
-elif page == "🍰 Cake Menu":
-
-    st.title("🍰 Cake Menu")
-
-    st.write(
-        "Explore our delicious cakes."
-    )
-
-    cakes = get_cakes()
-
-    if cakes:
-
+    recent = get_recent_orders(8)
+    if recent:
         df = pd.DataFrame(
-            cakes,
-            columns=[
-                "ID",
-                "Cake Name",
-                "Flavor",
-                "Price (₹)",
-                "Available Stock"
-            ]
+            recent,
+            columns=["Order ID", "Customer", "Cake", "Quantity", "Amount", "Order Date"]
         )
-
-        search = st.text_input(
-            "🔍 Search Cake",
-            placeholder="Search chocolate, vanilla..."
-        )
-
-        if search:
-
-            df = df[
-                df["Cake Name"]
-                .str.contains(
-                    search,
-                    case=False,
-                    na=False
-                )
-                |
-                df["Flavor"]
-                .str.contains(
-                    search,
-                    case=False,
-                    na=False
-                )
-            ]
-
-        st.dataframe(
-            df,
-            hide_index=True,
-            use_container_width=True
-        )
-
+        df["Amount"] = df["Amount"].apply(money)
+        st.dataframe(df, use_container_width=True, hide_index=True)
     else:
+        st.info("No orders yet. Go to Order Cake and place your first order.")
 
-        st.warning(
-            "No cakes found."
-        )
-
-
-# =========================================================
-# ORDER CAKE
-# =========================================================
-
-elif page == "🛒 Order Cake":
-
-    st.title("🛒 Order Your Cake")
+# ---------------------------------------------------------
+# CAKE MENU
+# ---------------------------------------------------------
+elif page == "🍰 Cake Menu":
+    st.markdown('<div class="section-title">🍰 Our Cake Menu</div>', unsafe_allow_html=True)
+    st.caption("Choose from our freshly baked cake collection.")
 
     cakes = get_cakes()
 
-    if cakes:
-
-        cake_options = {}
-
-        for cake in cakes:
-
-            cake_id = cake[0]
-
-            cake_name = cake[1]
-
-            price = cake[3]
-
-            stock = cake[4]
-
-            cake_options[
-                f"{cake_name} - ₹{price:,.0f} "
-                f"(Stock: {stock})"
-            ] = {
-
-                "id": cake_id,
-
-                "name": cake_name,
-
-                "price": price,
-
-                "stock": stock
-            }
-
-        selected_cake = st.selectbox(
-            "🎂 Select Cake",
-            list(cake_options.keys())
-        )
-
-        selected = cake_options[
-            selected_cake
-        ]
-
-        st.info(
-            f"Selected Cake: {selected['name']} | "
-            f"Price: ₹{selected['price']:,.0f} | "
-            f"Stock: {selected['stock']}"
-        )
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-
-            customer_name = st.text_input(
-                "👤 Customer Name"
-            )
-
-        with col2:
-
-            phone = st.text_input(
-                "📱 Mobile Number"
-            )
-
-        max_quantity = max(
-            1,
-            int(selected["stock"])
-        )
-
-        quantity = st.number_input(
-            "Quantity",
-            min_value=1,
-            max_value=max_quantity,
-            value=1,
-            step=1
-        )
-
-        total_price = (
-            selected["price"]
-            * quantity
-        )
-
-        st.markdown(
-            f"### 💰 Total Amount: ₹{total_price:,.0f}"
-        )
-
-        if st.button(
-            "🛒 Place Order",
-            use_container_width=True,
-            type="primary"
-        ):
-
-            if not customer_name.strip():
-
-                st.error(
-                    "Please enter customer name."
-                )
-
-            elif not phone.strip():
-
-                st.error(
-                    "Please enter mobile number."
-                )
-
-            elif selected["stock"] < quantity:
-
-                st.error(
-                    "Not enough stock available."
-                )
-
-            else:
-
-                customer_id = add_customer(
-                    customer_name,
-                    phone
-                )
-
-                success = add_order(
-                    customer_id,
-                    selected["id"],
-                    quantity,
-                    total_price
-                )
-
-                if success:
-
-                    st.success(
-                        "✅ Order placed successfully!"
-                    )
-
-                    st.balloons()
-
-                    st.write(
-                        f"**Customer:** {customer_name}"
-                    )
-
-                    st.write(
-                        f"**Cake:** {selected['name']}"
-                    )
-
-                    st.write(
-                        f"**Quantity:** {quantity}"
-                    )
-
-                    st.write(
-                        f"**Total:** ₹{total_price:,.0f}"
-                    )
-
-                else:
-
-                    st.error(
-                        "Unable to place order."
-                    )
-
+    if not cakes:
+        st.warning("No cakes available.")
     else:
+        cols = st.columns(3)
 
-        st.error(
-            "No cakes available."
-        )
+        for i, cake in enumerate(cakes):
+            cake_id, name, flavor, price, quantity = cake
 
+            with cols[i % 3]:
+                st.markdown(f"""
+                <div class="cake-card">
+                    <div style="font-size:42px;">🎂</div>
+                    <div class="cake-name">{name}</div>
+                    <div style="color:#7a8491;">Flavor: {flavor}</div>
+                    <br>
+                    <div class="price">{money(price)}</div>
+                    <div>Stock: <b>{quantity}</b></div>
+                </div>
+                """, unsafe_allow_html=True)
 
-# =========================================================
-# PROFESSIONAL DASHBOARD
-# =========================================================
+# ---------------------------------------------------------
+# ORDER CAKE
+# ---------------------------------------------------------
+elif page == "🛒 Order Cake":
+    st.markdown('<div class="section-title">🛒 Place a New Order</div>', unsafe_allow_html=True)
 
+    cakes = get_cakes()
+    available_cakes = [c for c in cakes if c[4] > 0]
+
+    if not available_cakes:
+        st.error("No cakes are currently in stock. Please update stock from Admin.")
+    else:
+        cake_options = {
+            f"{c[1]} — {money(c[3])} — Stock: {c[4]}": c
+            for c in available_cakes
+        }
+
+        selected_label = st.selectbox("Select Cake", list(cake_options.keys()))
+        selected = cake_options[selected_label]
+
+        cake_id, cake_name, flavor, price, stock = selected
+
+        st.write(f"**Flavor:** {flavor}  |  **Price:** {money(price)}  |  **Stock:** {stock}")
+
+        with st.form("order_form", clear_on_submit=True):
+            col1, col2 = st.columns(2)
+
+            with col1:
+                customer_name = st.text_input("Customer Name")
+                phone = st.text_input("Phone Number")
+
+            with col2:
+                quantity = st.number_input(
+                    "Quantity",
+                    min_value=1,
+                    max_value=int(stock),
+                    value=1,
+                    step=1,
+                )
+                total = float(price) * int(quantity)
+                st.metric("Order Total", money(total))
+
+            submitted = st.form_submit_button("🎂 Place Order", use_container_width=True)
+
+            if submitted:
+                if not customer_name.strip():
+                    st.error("Please enter customer name.")
+                elif not phone.strip():
+                    st.error("Please enter phone number.")
+                elif len(phone.strip()) < 10:
+                    st.error("Please enter a valid phone number.")
+                else:
+                    try:
+                        customer_id = add_customer(customer_name, phone)
+                        add_order(customer_id, cake_id, quantity, total)
+                        st.success("🎉 Order placed successfully!")
+                        st.balloons()
+                    except ValueError as e:
+                        st.error(str(e))
+                    except Exception as e:
+                        st.error(f"Unable to place order: {e}")
+
+# ---------------------------------------------------------
+# DASHBOARD
+# ---------------------------------------------------------
 elif page == "📊 Dashboard":
+    st.markdown('<div class="section-title">📊 Sales Dashboard</div>', unsafe_allow_html=True)
 
-    st.markdown("""
-    <div class="dashboard-header">
+    total_cakes, total_orders, total_customers, total_sales, sold, low_stock = get_dashboard_data()
 
-        <h1>📊 Sweet Cake Shop Dashboard</h1>
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("🍰 Cake Types", total_cakes)
+    c2.metric("🛒 Total Orders", total_orders)
+    c3.metric("👥 Customers", total_customers)
+    c4.metric("💰 Total Sales", money(total_sales))
 
-        <p>
-        Monitor sales, orders, customers and inventory
-        from one place.
-        </p>
+    st.caption(f"Total cakes sold: {sold}  •  Low-stock items: {low_stock}")
 
-    </div>
-    """, unsafe_allow_html=True)
+    st.divider()
 
-    col_refresh, col_space = st.columns(
-        [1, 5]
-    )
+    sales_by_cake = get_sales_by_cake()
+    daily_sales = get_sales_by_day()
 
-    with col_refresh:
+    left, right = st.columns(2)
 
-        if st.button(
-            "🔄 Refresh"
-        ):
+    with left:
+        st.subheader("🏆 Best-Selling Cakes")
+        if sales_by_cake:
+            df = pd.DataFrame(
+                sales_by_cake,
+                columns=["Cake", "Units Sold", "Sales"]
+            )
+            chart = px.bar(
+                df.head(8),
+                x="Cake",
+                y="Sales",
+                title="Sales by Cake"
+            )
+            chart.update_layout(xaxis_tickangle=-35)
+            st.plotly_chart(chart, use_container_width=True)
+        else:
+            st.info("No sales data available.")
 
-            st.rerun()
+    with right:
+        st.subheader("📈 Sales Trend")
+        if daily_sales:
+            df = pd.DataFrame(
+                daily_sales,
+                columns=["Date", "Sales"]
+            )
+            chart = px.line(
+                df,
+                x="Date",
+                y="Sales",
+                markers=True,
+                title="Daily Sales"
+            )
+            st.plotly_chart(chart, use_container_width=True)
+        else:
+            st.info("No sales data available.")
 
-    st.markdown("---")
+    st.divider()
 
-    # -----------------------------------------------------
-    # MAIN KPI
-    # -----------------------------------------------------
-
-    (
-        total_cakes,
-        total_orders,
-        total_customers,
-        total_sales
-    ) = get_dashboard_data()
-
-    col1, col2, col3, col4 = st.columns(4)
-
-    with col1:
-
-        st.metric(
-            "🍰 Total Cakes",
-            total_cakes
-        )
-
-    with col2:
-
-        st.metric(
-            "🛒 Total Orders",
-            total_orders
-        )
-
-    with col3:
-
-        st.metric(
-            "👥 Customers",
-            total_customers
-        )
-
-    with col4:
-
-        st.metric(
-            "💰 Total Sales",
-            f"₹{total_sales:,.0f}"
-        )
-
-    st.markdown("---")
-
-    # -----------------------------------------------------
-    # ORDERS
-    # -----------------------------------------------------
-
+    st.subheader("🧾 Recent Orders")
     orders = get_orders()
 
     if orders:
-
-        orders_df = pd.DataFrame(
+        df = pd.DataFrame(
             orders,
             columns=[
-                "Order ID",
-                "Customer",
-                "Cake",
-                "Quantity",
-                "Amount",
-                "Order Date"
+                "Order ID", "Customer", "Phone", "Cake",
+                "Flavor", "Quantity", "Amount", "Order Date"
             ]
         )
+        st.dataframe(df, use_container_width=True, hide_index=True)
 
-        orders_df["Order Date"] = pd.to_datetime(
-            orders_df["Order Date"],
-            errors="coerce"
-        )
-
-        # -------------------------------------------------
-        # DATE FILTER
-        # -------------------------------------------------
-
-        st.subheader(
-            "📅 Sales Date Filter"
-        )
-
-        min_date = (
-            orders_df["Order Date"]
-            .min()
-            .date()
-        )
-
-        max_date = (
-            orders_df["Order Date"]
-            .max()
-            .date()
-        )
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-
-            start_date = st.date_input(
-                "Start Date",
-                value=min_date
+        report = create_excel_report()
+        if report:
+            st.download_button(
+                "📥 Download Sales Report (Excel)",
+                data=report,
+                file_name="sweet_cake_sales_report.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
             )
-
-        with col2:
-
-            end_date = st.date_input(
-                "End Date",
-                value=max_date
-            )
-
-        if start_date > end_date:
-
-            st.error(
-                "Start Date cannot be greater than End Date."
-            )
-
-        else:
-
-            filtered_orders = orders_df[
-                (
-                    orders_df["Order Date"].dt.date
-                    >= start_date
-                )
-                &
-                (
-                    orders_df["Order Date"].dt.date
-                    <= end_date
-                )
-            ]
-
-            st.info(
-                f"Showing {len(filtered_orders)} orders "
-                f"from {start_date} to {end_date}"
-            )
-
-            # -------------------------------------------------
-            # FILTERED KPI
-            # -------------------------------------------------
-
-            filtered_sales = (
-                filtered_orders["Amount"].sum()
-            )
-
-            filtered_order_count = (
-                len(filtered_orders)
-            )
-
-            filtered_quantity = (
-                filtered_orders["Quantity"].sum()
-            )
-
-            average_order = (
-                filtered_sales
-                / filtered_order_count
-                if filtered_order_count > 0
-                else 0
-            )
-
-            col1, col2, col3, col4 = st.columns(4)
-
-            with col1:
-
-                st.metric(
-                    "💰 Filtered Sales",
-                    f"₹{filtered_sales:,.0f}"
-                )
-
-            with col2:
-
-                st.metric(
-                    "🛒 Filtered Orders",
-                    filtered_order_count
-                )
-
-            with col3:
-
-                st.metric(
-                    "🎂 Cakes Sold",
-                    filtered_quantity
-                )
-
-            with col4:
-
-                st.metric(
-                    "💵 Avg Order",
-                    f"₹{average_order:,.0f}"
-                )
-
-            st.markdown("---")
-
-            if not filtered_orders.empty:
-
-                # =========================================
-                # MONTHLY SALES
-                # =========================================
-
-                st.subheader(
-                    "📈 Monthly Sales Analysis"
-                )
-
-                monthly_sales = (
-                    filtered_orders
-                    .set_index("Order Date")
-                    .resample("ME")["Amount"]
-                    .sum()
-                    .reset_index()
-                )
-
-                monthly_sales["Month"] = (
-                    monthly_sales["Order Date"]
-                    .dt.strftime("%b %Y")
-                )
-
-                fig_monthly = px.line(
-                    monthly_sales,
-                    x="Month",
-                    y="Amount",
-                    markers=True,
-                    text="Amount",
-                    title="Monthly Revenue Trend"
-                )
-
-                fig_monthly.update_traces(
-                    texttemplate="₹%{text:,.0f}",
-                    textposition="top center"
-                )
-
-                fig_monthly.update_layout(
-                    xaxis_title="Month",
-                    yaxis_title="Revenue (₹)",
-                    plot_bgcolor="white",
-                    paper_bgcolor="white"
-                )
-
-                st.plotly_chart(
-                    fig_monthly,
-                    use_container_width=True
-                )
-
-                st.markdown("---")
-
-                # =========================================
-                # CAKE ANALYSIS
-                # =========================================
-
-                orders_by_cake = (
-                    filtered_orders
-                    .groupby("Cake")["Quantity"]
-                    .sum()
-                    .reset_index()
-                    .sort_values(
-                        "Quantity",
-                        ascending=False
-                    )
-                )
-
-                sales_by_cake = (
-                    filtered_orders
-                    .groupby("Cake")["Amount"]
-                    .sum()
-                    .reset_index()
-                    .sort_values(
-                        "Amount",
-                        ascending=False
-                    )
-                )
-
-                best_cake = (
-                    orders_by_cake.iloc[0]["Cake"]
-                )
-
-                best_cake_quantity = int(
-                    orders_by_cake.iloc[0]["Quantity"]
-                )
-
-                col1, col2 = st.columns(2)
-
-                with col1:
-
-                    st.subheader(
-                        "🏆 Best Selling Cake"
-                    )
-
-                    st.success(
-                        f"🎂 {best_cake}\n\n"
-                        f"{best_cake_quantity} cakes sold"
-                    )
-
-                with col2:
-
-                    st.subheader(
-                        "💵 Average Order Value"
-                    )
-
-                    st.info(
-                        f"₹{average_order:,.0f}"
-                    )
-
-                st.markdown("---")
-
-                # =========================================
-                # CHARTS
-                # =========================================
-
-                col1, col2 = st.columns(2)
-
-                with col1:
-
-                    st.subheader(
-                        "💰 Sales by Cake"
-                    )
-
-                    fig1 = px.bar(
-                        sales_by_cake,
-                        x="Cake",
-                        y="Amount",
-                        text="Amount",
-                        title="Cake-wise Sales"
-                    )
-
-                    fig1.update_traces(
-                        texttemplate="₹%{text:,.0f}",
-                        textposition="outside"
-                    )
-
-                    fig1.update_layout(
-                        xaxis_title="Cake",
-                        yaxis_title="Sales (₹)",
-                        plot_bgcolor="white",
-                        paper_bgcolor="white"
-                    )
-
-                    st.plotly_chart(
-                        fig1,
-                        use_container_width=True
-                    )
-
-                with col2:
-
-                    st.subheader(
-                        "🍰 Order Distribution"
-                    )
-
-                    fig2 = px.pie(
-                        orders_by_cake,
-                        names="Cake",
-                        values="Quantity",
-                        hole=0.45,
-                        title="Orders by Cake"
-                    )
-
-                    st.plotly_chart(
-                        fig2,
-                        use_container_width=True
-                    )
-
-                st.markdown("---")
-
-                # =========================================
-                # TOP CUSTOMERS
-                # =========================================
-
-                st.subheader(
-                    "👥 Top Customers"
-                )
-
-                top_customers = (
-                    filtered_orders
-                    .groupby("Customer")
-                    .agg(
-                        Orders=("Order ID", "count"),
-                        Sales=("Amount", "sum")
-                    )
-                    .reset_index()
-                    .sort_values(
-                        "Sales",
-                        ascending=False
-                    )
-                    .head(10)
-                )
-
-                top_customers["Sales"] = (
-                    top_customers["Sales"]
-                    .round(0)
-                )
-
-                st.dataframe(
-                    top_customers,
-                    hide_index=True,
-                    use_container_width=True
-                )
-
-                st.markdown("---")
-
-                # =========================================
-                # RECENT ORDERS
-                # =========================================
-
-                st.subheader(
-                    "🛒 Recent Orders"
-                )
-
-                recent_orders = (
-                    filtered_orders
-                    .sort_values(
-                        "Order Date",
-                        ascending=False
-                    )
-                    .head(10)
-                    .copy()
-                )
-
-                recent_orders["Order Date"] = (
-                    recent_orders["Order Date"]
-                    .dt.strftime(
-                        "%d-%m-%Y %H:%M"
-                    )
-                )
-
-                st.dataframe(
-                    recent_orders,
-                    hide_index=True,
-                    use_container_width=True
-                )
-
-                st.markdown("---")
-
-                # =========================================
-                # EXCEL DOWNLOAD
-                # =========================================
-
-                st.subheader(
-                    "📥 Download Sales Report"
-                )
-
-                excel_file = create_excel_report(
-                    filtered_orders
-                )
-
-                st.download_button(
-                    label="📊 Download Excel Report",
-                    data=excel_file,
-                    file_name="cake_shop_sales_report.xlsx",
-                    mime=(
-                        "application/vnd.openxmlformats-officedocument."
-                        "spreadsheetml.sheet"
-                    ),
-                    use_container_width=True
-                )
-
-            else:
-
-                st.warning(
-                    "No orders found for the selected dates."
-                )
-
     else:
+        st.info("No orders yet. Place orders from the Order Cake page.")
 
-        st.info(
-            "📭 No orders available yet. "
-            "Place an order from Order Cake."
-        )
-
-    # -----------------------------------------------------
-    # STOCK MANAGEMENT
-    # -----------------------------------------------------
-
-    st.markdown("---")
-
-    st.subheader(
-        "⚠️ Stock Management"
-    )
-
-    cakes = get_cakes()
-
-    if cakes:
-
-        cakes_df = pd.DataFrame(
-            cakes,
-            columns=[
-                "ID",
-                "Cake Name",
-                "Flavor",
-                "Price",
-                "Stock"
-            ]
-        )
-
-        low_stock = cakes_df[
-            cakes_df["Stock"] <= 5
-        ]
-
-        if not low_stock.empty:
-
-            st.warning(
-                "⚠️ Some cakes have low stock!"
-            )
-
-            st.dataframe(
-                low_stock,
-                hide_index=True,
-                use_container_width=True
-            )
-
-        else:
-
-            st.success(
-                "✅ All cakes have sufficient stock."
-            )
-
-
-# =========================================================
-# ADMIN PANEL
-# =========================================================
-
+# ---------------------------------------------------------
+# ADMIN
+# ---------------------------------------------------------
 elif page == "🔐 Admin":
+    st.markdown('<div class="section-title">🔐 Admin Panel</div>', unsafe_allow_html=True)
 
-    st.title(
-        "🔐 Admin Panel"
+    password = st.text_input(
+        "Admin Password",
+        type="password",
+        placeholder="Enter admin password"
     )
 
-    st.write(
-        "Manage cakes, inventory and practice data."
-    )
+    if password == "admin123":
+        st.success("Admin access granted.")
 
-    # -----------------------------------------------------
-    # LOGIN
-    # -----------------------------------------------------
+        tab1, tab2, tab3, tab4 = st.tabs([
+            "➕ Add Cake",
+            "✏️ Update Cake",
+            "🗑️ Delete Cake",
+            "🧪 Practice Orders",
+        ])
 
-    if "admin_logged_in" not in st.session_state:
+        with tab1:
+            st.subheader("Add New Cake")
+            with st.form("add_cake_form", clear_on_submit=True):
+                name = st.text_input("Cake Name")
+                flavor = st.text_input("Flavor")
+                price = st.number_input("Price", min_value=0.0, value=500.0, step=50.0)
+                quantity = st.number_input("Stock Quantity", min_value=0, value=10, step=1)
 
-        st.session_state.admin_logged_in = False
+                if st.form_submit_button("➕ Add Cake", use_container_width=True):
+                    if not name.strip():
+                        st.error("Cake name is required.")
+                    else:
+                        add_cake(name, flavor, price, quantity)
+                        st.success("Cake added successfully.")
+                        st.rerun()
 
-    if not st.session_state.admin_logged_in:
-
-        st.subheader(
-            "Admin Login"
-        )
-
-        username = st.text_input(
-            "Username"
-        )
-
-        password = st.text_input(
-            "Password",
-            type="password"
-        )
-
-        if st.button(
-            "🔐 Login",
-            use_container_width=True,
-            type="primary"
-        ):
-
-            if (
-                username == "admin"
-                and password == "admin123"
-            ):
-
-                st.session_state.admin_logged_in = True
-
-                st.success(
-                    "Login successful!"
-                )
-
-                st.rerun()
-
-            else:
-
-                st.error(
-                    "Invalid username or password."
-                )
-
-    # -----------------------------------------------------
-    # ADMIN AREA
-    # -----------------------------------------------------
-
-    else:
-
-        st.success(
-            "Welcome Admin! 👋"
-        )
-
-        admin_option = st.selectbox(
-            "Select Admin Action",
-            [
-                "Add Cake",
-                "Update Cake",
-                "Delete Cake",
-                "View Cakes",
-                "Generate Practice Orders"
-            ]
-        )
-
-        # ================================================
-        # ADD CAKE
-        # ================================================
-
-        if admin_option == "Add Cake":
-
-            st.subheader(
-                "➕ Add New Cake"
-            )
-
-            cake_name = st.text_input(
-                "Cake Name"
-            )
-
-            flavor = st.text_input(
-                "Flavor"
-            )
-
-            price = st.number_input(
-                "Price",
-                min_value=0.0,
-                step=50.0
-            )
-
-            quantity = st.number_input(
-                "Stock Quantity",
-                min_value=0,
-                step=1
-            )
-
-            if st.button(
-                "➕ Add Cake",
-                use_container_width=True
-            ):
-
-                if cake_name and flavor:
-
-                    add_cake(
-                        cake_name,
-                        flavor,
-                        price,
-                        quantity
-                    )
-
-                    st.success(
-                        "Cake added successfully! 🎂"
-                    )
-
-                    st.rerun()
-
-                else:
-
-                    st.error(
-                        "Please enter cake name and flavor."
-                    )
-
-        # ================================================
-        # UPDATE CAKE
-        # ================================================
-
-        elif admin_option == "Update Cake":
-
-            st.subheader(
-                "✏️ Update Cake"
-            )
-
+        with tab2:
             cakes = get_cakes()
 
             if cakes:
+                options = {f"{c[1]} (ID {c[0]})": c for c in cakes}
+                selected_label = st.selectbox("Select Cake to Update", list(options.keys()))
+                cake = options[selected_label]
 
-                cake_dict = {}
+                with st.form("update_cake_form"):
+                    new_name = st.text_input("Cake Name", value=cake[1])
+                    new_flavor = st.text_input("Flavor", value=cake[2] or "")
+                    new_price = st.number_input("Price", min_value=0.0, value=float(cake[3]), step=50.0)
+                    new_qty = st.number_input("Stock", min_value=0, value=int(cake[4]), step=1)
 
-                for cake in cakes:
+                    if st.form_submit_button("💾 Save Changes", use_container_width=True):
+                        update_cake(cake[0], new_name, new_flavor, new_price, new_qty)
+                        st.success("Cake updated successfully.")
+                        st.rerun()
 
-                    cake_dict[
-                        f"{cake[1]} - ID {cake[0]}"
-                    ] = cake
-
-                selected = st.selectbox(
-                    "Select Cake",
-                    list(cake_dict.keys())
-                )
-
-                cake = cake_dict[selected]
-
-                cake_id = cake[0]
-
-                cake_name = st.text_input(
-                    "Cake Name",
-                    value=cake[1]
-                )
-
-                flavor = st.text_input(
-                    "Flavor",
-                    value=cake[2]
-                )
-
-                price = st.number_input(
-                    "Price",
-                    min_value=0.0,
-                    value=float(cake[3])
-                )
-
-                quantity = st.number_input(
-                    "Stock",
-                    min_value=0,
-                    value=int(cake[4])
-                )
-
-                if st.button(
-                    "💾 Update Cake",
-                    use_container_width=True
-                ):
-
-                    update_cake(
-                        cake_id,
-                        cake_name,
-                        flavor,
-                        price,
-                        quantity
-                    )
-
-                    st.success(
-                        "Cake updated successfully! ✅"
-                    )
-
-                    st.rerun()
-
-            else:
-
-                st.info(
-                    "No cakes available."
-                )
-
-        # ================================================
-        # DELETE CAKE
-        # ================================================
-
-        elif admin_option == "Delete Cake":
-
-            st.subheader(
-                "🗑️ Delete Cake"
-            )
-
+        with tab3:
             cakes = get_cakes()
 
             if cakes:
+                options = {f"{c[1]} (ID {c[0]})": c[0] for c in cakes}
+                selected_label = st.selectbox("Select Cake to Delete", list(options.keys()))
 
-                cake_dict = {}
+                if st.button("🗑️ Delete Selected Cake", use_container_width=True):
+                    ok = delete_cake(options[selected_label])
 
-                for cake in cakes:
+                    if ok:
+                        st.success("Cake deleted successfully.")
+                        st.rerun()
+                    else:
+                        st.error("This cake already has orders, so it cannot be deleted. Update its stock instead.")
 
-                    cake_dict[
-                        f"{cake[1]} - ID {cake[0]}"
-                    ] = cake[0]
+        with tab4:
+            st.subheader("Generate Practice Orders")
+            st.caption("Use this only for demo/portfolio data. It creates sample customers and orders.")
 
-                selected = st.selectbox(
-                    "Select Cake",
-                    list(cake_dict.keys())
-                )
-
-                cake_id = cake_dict[selected]
-
-                if st.button(
-                    "🗑️ Delete Cake",
-                    use_container_width=True
-                ):
-
-                    delete_cake(
-                        cake_id
-                    )
-
-                    st.success(
-                        "Cake deleted successfully."
-                    )
-
-                    st.rerun()
-
-            else:
-
-                st.info(
-                    "No cakes available."
-                )
-
-        # ================================================
-        # VIEW CAKES
-        # ================================================
-
-        elif admin_option == "View Cakes":
-
-            st.subheader(
-                "🍰 Cake Inventory"
-            )
-
-            cakes = get_cakes()
-
-            if cakes:
-
-                df = pd.DataFrame(
-                    cakes,
-                    columns=[
-                        "ID",
-                        "Cake Name",
-                        "Flavor",
-                        "Price",
-                        "Stock"
-                    ]
-                )
-
-                st.dataframe(
-                    df,
-                    hide_index=True,
-                    use_container_width=True
-                )
-
-            else:
-
-                st.info(
-                    "No cakes available."
-                )
-
-        # ================================================
-        # PRACTICE ORDERS
-        # ================================================
-
-        elif admin_option == "Generate Practice Orders":
-
-            st.subheader(
-                "📊 Generate Practice Orders"
-            )
-
-            st.info(
-                "Use this option to create sample "
-                "orders for testing the Dashboard."
-            )
-
-            number_of_orders = st.number_input(
-                "Number of Orders",
+            count = st.number_input(
+                "Number of Practice Orders",
                 min_value=1,
                 max_value=500,
                 value=50,
-                step=10
+                step=10,
             )
 
-            if st.button(
-                "🚀 Generate Orders",
-                use_container_width=True,
-                type="primary"
-            ):
-
-                created = generate_practice_orders(
-                    number_of_orders
-                )
-
-                st.success(
-                    f"✅ {created} practice orders created!"
-                )
-
+            if st.button("🧪 Generate Practice Orders", use_container_width=True):
+                created = generate_practice_orders(int(count))
+                st.success(f"{created} practice orders created successfully.")
                 st.rerun()
 
-        # ================================================
-        # LOGOUT
-        # ================================================
+        st.divider()
+        st.subheader("📦 Current Stock")
 
-        st.markdown("---")
+        cakes = get_cakes()
+        if cakes:
+            stock_df = pd.DataFrame(
+                cakes,
+                columns=["ID", "Cake", "Flavor", "Price", "Stock"]
+            )
+            st.dataframe(stock_df, use_container_width=True, hide_index=True)
 
-        if st.button(
-            "🚪 Logout",
-            use_container_width=True
-        ):
+    elif password:
+        st.error("Incorrect password.")
 
-            st.session_state.admin_logged_in = False
-
-            st.rerun()
+# ---------------------------------------------------------
+# FOOTER
+# ---------------------------------------------------------
+st.markdown(
+    '<div class="footer">🎂 Sweet Cake Shop • Cake Shop Management System • Built with Python, Streamlit & SQLite</div>',
+    unsafe_allow_html=True
+)
